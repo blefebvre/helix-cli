@@ -124,12 +124,24 @@ export class HelixImportServer extends BaseServer {
     respHeaders['access-control-allow-origin'] = '*';
     delete respHeaders['set-cookie'];
 
-    if (respHeaders.location && !respHeaders.location.startsWith('/')) {
-      const u = new URL(respHeaders.location);
+    let locationHeader = respHeaders.location;
+    if (locationHeader && locationHeader.startsWith('//')) {
+      // Parse protocol from url variable
+      const protocol = url.split('://')[0];
+      locationHeader = `${protocol}:${locationHeader}`;
+    }
+    ctx.log.debug(`locationHeader with protocol: ${locationHeader}`);
+    if (locationHeader && (locationHeader.startsWith('http'))) { // } || locationHeader.startsWith('//'))) {
+      // Handle fully qualified URLs
+      const u = new URL(locationHeader);
+
+      ctx.log.debug(`u.origin: ${u.origin} host: ${host}`);
       if (u.origin === host) {
         respHeaders.location = u.pathname;
       }
     }
+
+    ctx.log.debug(`New Location header: ${respHeaders.location}`);
 
     let buffer = await ret.buffer();
     if (contentType.includes('html') || contentType.includes('text')) {
@@ -182,7 +194,7 @@ export class HelixImportServer extends BaseServer {
       // codecov:ignore:start
       /* c8 ignore start */
       } catch (err) {
-        log.error(`Failed to proxy AEM request ${ctx.path}: ${err.message}`);
+        log.error(`Failed to proxy AEM request ${host}${ctx.path}: ${err.message}`);
         res.status(502).send(`Failed to proxy AEM request: ${err.message}`);
       }
       // codecov:ignore:end
